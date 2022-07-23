@@ -580,7 +580,19 @@ func GenFieldsFromProperties(props []Property) []string {
 			}
 		}
 
-		field += fmt.Sprintf("    %s %s", goFieldName, p.GoTypeDef())
+		typeDef := p.GoTypeDef()
+		if extPointer, ok := p.ExtensionProps.Extensions["x-go-pointer"]; ok {
+			if val, err := extString(extPointer); err == nil {
+				if val == "true" {
+					typeDef = "*" + strings.TrimPrefix(typeDef, "*")
+				}
+				if val == "false" {
+					typeDef = strings.TrimPrefix(typeDef, "*")
+				}
+			}
+		}
+
+		field += fmt.Sprintf("    %s %s", goFieldName, typeDef)
 
 		// Support x-omitempty
 		overrideOmitEmpty := true
@@ -635,6 +647,13 @@ func additionalPropertiesType(schema Schema) string {
 func GenStructFromSchema(schema Schema) string {
 	// Start out with struct {
 	objectParts := []string{"struct {"}
+
+	if extBunDB, ok := schema.OAPISchema.ExtensionProps.Extensions["x-go-bundb"]; ok {
+		if bunDBTag, err := extString(extBunDB); err == nil {
+			objectParts = append(objectParts, "bun.BaseModel `bun:\""+string(bunDBTag)+"\"`", "")
+		}
+	}
+
 	// Append all the field definitions
 	objectParts = append(objectParts, GenFieldsFromProperties(schema.Properties)...)
 	// Close the struct
