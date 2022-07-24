@@ -75,6 +75,7 @@ type ServerHandler struct {
         handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) interface{}{
             return sh.handler.{{.OperationId}}(ctx, request.({{$opid | ucFirst}}RequestObject))
         }
+
         for _, middleware := range sh.middlewares {
             handler = middleware(handler, "{{.OperationId}}")
         }
