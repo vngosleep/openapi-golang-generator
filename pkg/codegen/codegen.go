@@ -165,6 +165,14 @@ func Generate(spec *openapi3.T, opts Configuration) (string, error) {
 		}
 	}
 
+	var bunServerOut string
+	if opts.Generate.BunServer {
+		bunServerOut, err = GenerateBunServer(t, ops)
+		if err != nil {
+			return "", fmt.Errorf("error generating Go handlers for Paths: %w", err)
+		}
+	}
+
 	var chiServerOut string
 	if opts.Generate.ChiServer {
 		chiServerOut, err = GenerateChiServer(t, ops)
@@ -274,6 +282,13 @@ func Generate(spec *openapi3.T, opts Configuration) (string, error) {
 
 	if opts.Generate.ChiServer {
 		_, err = w.WriteString(chiServerOut)
+		if err != nil {
+			return "", fmt.Errorf("error writing server path handlers: %w", err)
+		}
+	}
+
+	if opts.Generate.BunServer {
+		_, err = w.WriteString(bunServerOut)
 		if err != nil {
 			return "", fmt.Errorf("error writing server path handlers: %w", err)
 		}
