@@ -880,6 +880,12 @@ func GenerateTypesForOperations(t *template.Template, ops []OperationDefinition)
 	return buf.String(), nil
 }
 
+// GenerateBunServer This function generates all the go code for the ServerInterface as well as
+// all the wrapper functions around our handlers.
+func GenerateBunServer(t *template.Template, operations []OperationDefinition) (string, error) {
+	return GenerateTemplates([]string{"bunrouter/bunrouter-interface.tmpl", "bunrouter/bunrouter-middleware.tmpl", "bunrouter/bunrouter-handler.tmpl"}, t, operations)
+}
+
 // GenerateChiServer This function generates all the go code for the ServerInterface as well as
 // all the wrapper functions around our handlers.
 func GenerateChiServer(t *template.Template, operations []OperationDefinition) (string, error) {
@@ -914,6 +920,9 @@ func GenerateStrictServer(t *template.Template, operations []OperationDefinition
 	}
 	if opts.Generate.GinServer {
 		templates = append(templates, "strict/strict-gin.tmpl")
+	}
+	if opts.Generate.BunServer {
+		templates = []string{"strict/strict-interface-generic.tmpl", "strict/strict-bunrouter.tmpl"}
 	}
 	return GenerateTemplates(templates, t, operations)
 }
