@@ -636,9 +636,10 @@ func GenerateEnums(t *template.Template, types []TypeDefinition) (string, error)
 				wrapper = `"`
 			}
 			enums = append(enums, EnumDefinition{
-				Schema:       tp.Schema,
-				TypeName:     tp.TypeName,
-				ValueWrapper: wrapper,
+				Schema:         tp.Schema,
+				TypeName:       tp.TypeName,
+				ValueWrapper:   wrapper,
+				PrefixTypeName: globalState.options.Compatibility.AlwaysPrefixEnumValues,
 			})
 		}
 	}
@@ -655,8 +656,8 @@ func GenerateEnums(t *template.Template, types []TypeDefinition) (string, error)
 			for e1key := range e1.GetValues() {
 				_, found := e2.GetValues()[e1key]
 				if found {
-					e1.Conflicts = true
-					e2.Conflicts = true
+					e1.PrefixTypeName = true
+					e2.PrefixTypeName = true
 					enums[i] = e1
 					enums[j] = e2
 					break
@@ -672,7 +673,7 @@ func GenerateEnums(t *template.Template, types []TypeDefinition) (string, error)
 			}
 			_, found := e1.Schema.EnumValues[tp.TypeName]
 			if found {
-				e1.Conflicts = true
+				e1.PrefixTypeName = true
 				enums[i] = e1
 			}
 		}
@@ -681,7 +682,7 @@ func GenerateEnums(t *template.Template, types []TypeDefinition) (string, error)
 		// type name.
 		_, found := e1.GetValues()[e1.TypeName]
 		if found {
-			e1.Conflicts = true
+			e1.PrefixTypeName = true
 			enums[i] = e1
 		}
 	}
@@ -834,7 +835,6 @@ func GetTypeDefinitionsImports(swagger *openapi3.T, excludeSchemas []string) (ma
 }
 
 func GetSchemaImports(schemas map[string]*openapi3.SchemaRef, excludeSchemas []string) (map[string]goImport, error) {
-	var err error
 	res := map[string]goImport{}
 	excludeSchemasMap := make(map[string]bool)
 	for _, schema := range excludeSchemas {
@@ -850,17 +850,20 @@ func GetSchemaImports(schemas map[string]*openapi3.SchemaRef, excludeSchemas []s
 			continue
 		}
 
-		res, err = GetImports(schema.Properties)
+		imprts, err := GetImports(schema.Properties)
 		if err != nil {
 			return nil, err
+		}
+
+		for s, gi := range imprts {
+			res[s] = gi
 		}
 	}
 	return res, nil
 }
 
 func GetRequestBodiesImports(bodies map[string]*openapi3.RequestBodyRef) (map[string]goImport, error) {
-	var res map[string]goImport
-	var err error
+	res := map[string]goImport{}
 	for _, requestBodyName := range SortedRequestBodyKeys(bodies) {
 		requestBodyRef := bodies[requestBodyName]
 		response := requestBodyRef.Value
@@ -871,9 +874,13 @@ func GetRequestBodiesImports(bodies map[string]*openapi3.RequestBodyRef) (map[st
 				continue
 			}
 
-			res, err = GetImports(schema.Value.Properties)
+			imprts, err := GetImports(schema.Value.Properties)
 			if err != nil {
 				return nil, err
+			}
+
+			for s, gi := range imprts {
+				res[s] = gi
 			}
 		}
 	}
@@ -881,8 +888,7 @@ func GetRequestBodiesImports(bodies map[string]*openapi3.RequestBodyRef) (map[st
 }
 
 func GetResponsesImports(responses map[string]*openapi3.ResponseRef) (map[string]goImport, error) {
-	var res map[string]goImport
-	var err error
+	res := map[string]goImport{}
 	for _, responseName := range SortedResponsesKeys(responses) {
 		responseOrRef := responses[responseName]
 		response := responseOrRef.Value
@@ -893,9 +899,13 @@ func GetResponsesImports(responses map[string]*openapi3.ResponseRef) (map[string
 				continue
 			}
 
-			res, err = GetImports(schema.Value.Properties)
+			imprts, err := GetImports(schema.Value.Properties)
 			if err != nil {
 				return nil, err
+			}
+
+			for s, gi := range imprts {
+				res[s] = gi
 			}
 		}
 	}
