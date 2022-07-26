@@ -317,6 +317,8 @@ func newConfigFromOldConfig(c oldConfiguration) configuration {
 			opts.Generate.Client = true
 		case "chi-server":
 			opts.Generate.ChiServer = true
+		case "bun-server":
+			opts.Generate.BunServer = true
 		case "server":
 			opts.Generate.EchoServer = true
 		case "gin":

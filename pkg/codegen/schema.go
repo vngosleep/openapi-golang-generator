@@ -585,7 +585,7 @@ func GenFieldsFromProperties(props []Property) []string {
 		}
 
 		typeDef := p.GoTypeDef()
-		if extPointer, ok := p.ExtensionProps.Extensions["x-go-pointer"]; ok {
+		if extPointer, ok := p.ExtensionProps.Extensions[extGoPointer]; ok {
 			if val, err := extString(extPointer); err == nil {
 				if val == "true" {
 					typeDef = "*" + strings.TrimPrefix(typeDef, "*")
@@ -652,9 +652,16 @@ func GenStructFromSchema(schema Schema) string {
 	// Start out with struct {
 	objectParts := []string{"struct {"}
 
-	if extBunDB, ok := schema.OAPISchema.ExtensionProps.Extensions["x-go-bundb"]; ok {
-		if bunDBTag, err := extString(extBunDB); err == nil {
-			objectParts = append(objectParts, "bun.BaseModel `bun:\""+string(bunDBTag)+"\"`", "")
+	if extEmbedValue, ok := schema.OAPISchema.ExtensionProps.Extensions[extPropEmbed]; ok {
+		if embeds, err := extEmbed(extEmbedValue); err == nil {
+			for modelName, tag := range embeds {
+				embedStr := modelName
+				if tag != "" {
+					embedStr = embedStr + " " + "`" + tag + "`"
+				}
+
+				objectParts = append(objectParts, embedStr, "")
+			}
 		}
 	}
 

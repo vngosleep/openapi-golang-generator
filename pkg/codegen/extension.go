@@ -8,8 +8,10 @@ import (
 const (
 	extPropGoType    = "x-go-type"
 	extGoName        = "x-go-name"
+	extGoPointer     = "x-go-pointer"
 	extPropOmitEmpty = "x-omitempty"
 	extPropExtraTags = "x-oapi-codegen-extra-tags"
+	extPropEmbed     = "x-go-embed"
 )
 
 func extString(extPropValue interface{}) (string, error) {
@@ -56,4 +58,16 @@ func extExtraTags(extPropValue interface{}) (map[string]string, error) {
 		return nil, fmt.Errorf("failed to unmarshal json: %w", err)
 	}
 	return tags, nil
+}
+
+func extEmbed(extPropValue interface{}) (map[string]string, error) {
+	raw, ok := extPropValue.(json.RawMessage)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert type: %T", extPropValue)
+	}
+	var embeds map[string]string
+	if err := json.Unmarshal(raw, &embeds); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json: %w", err)
+	}
+	return embeds, nil
 }

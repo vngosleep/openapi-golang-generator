@@ -1,0 +1,33 @@
+type BunRouterOptions struct {
+	BaseURL          string
+	BaseRouter       *bunrouter.Router
+	Middlewares      []MiddlewareFunc
+	ErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+// HandlerWithOptions creates http.Handler with additional options
+func NewRouter(handler IServerHandler, options BunRouterOptions) http.Handler {
+r := options.BaseRouter
+
+if r == nil {
+    r = bunrouter.New()
+}
+
+if options.ErrorHandlerFunc == nil {
+    options.ErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+    }
+}
+
+{{if .}}runner := ServerRunner{
+Handler: handler,
+HandlerMiddlewares: options.Middlewares,
+ErrorHandlerFunc: options.ErrorHandlerFunc,
+}
+{{end}}
+{{range .}}r.WithGroup(options.BaseURL, func(r *bunrouter.Group) {
+r.{{.Method}}("{{.Path | swaggerUriToBunUri}}", bunrouter.HTTPHandlerFunc(runner.{{.OperationId}}))
+})
+{{end}}
+return r
+}
