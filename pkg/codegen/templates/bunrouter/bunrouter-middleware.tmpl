@@ -20,17 +20,17 @@ func (runner *ServerRunner) {{$opid}}(w http.ResponseWriter, r *http.Request) {
   var {{$varName := .GoVariableName}}{{$varName}} {{.TypeDef}}
 
   {{if .IsPassThrough}}
-  {{$varName}} = chi.URLParam(r, "{{.ParamName}}")
+  {{$varName}} = bunrouter.NewRequest(r).Param("{{.ParamName}}")
   {{end}}
   {{if .IsJson}}
-  err = json.Unmarshal([]byte(chi.URLParam(r, "{{.ParamName}}")), &{{$varName}})
+  err = json.Unmarshal([]byte(bunrouter.NewRequest(r).Param("{{.ParamName}}")), &{{$varName}})
   if err != nil {
     runner.ErrorHandlerFunc(w, r, &UnmarshalingParamError{ParamName: "{{.ParamName}}", Err: err})
     return
   }
   {{end}}
   {{if .IsStyled}}
-  err = runtime.BindStyledParameterWithLocation("{{.Style}}",{{.Explode}}, "{{.ParamName}}", runtime.ParamLocationPath, chi.URLParam(r, "{{.ParamName}}"), &{{$varName}})
+  err = runtime.BindStyledParameterWithLocation("{{.Style}}",{{.Explode}}, "{{.ParamName}}", runtime.ParamLocationPath, bunrouter.NewRequest(r).Param("{{.ParamName}}"), &{{$varName}})
   if err != nil {
     runner.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "{{.ParamName}}", Err: err})
     return

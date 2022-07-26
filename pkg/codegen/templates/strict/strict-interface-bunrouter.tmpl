@@ -86,7 +86,7 @@
     {{end}}
 {{end}}
 
-// StrictServerInterface represents all server handlers.
+// IStrictHandler represents all server handlers.
 type IStrictHandler interface {
 {{range .}}{{.SummaryAsComment }}
 // ({{.Method}} {{.Path}})
@@ -94,3 +94,20 @@ type IStrictHandler interface {
 {{$opid}}(ctx context.Context, request {{$opid | ucFirst}}RequestObject) interface{}
 {{end}}{{/* range . */ -}}
 }
+
+// TODOHandler implemented IStrictHandler
+type TODOHandler struct {}
+
+{{range .}}{{.SummaryAsComment }}
+// ({{.Method}} {{.Path}})
+{{$opid := .OperationId -}}
+func (h *TODOHandler) {{$opid}}(ctx context.Context, request {{$opid | ucFirst}}RequestObject) interface{} {
+    {{range .Responses}}{{$statusCode := .StatusCode -}}
+        {{range .Contents}}
+            _ = {{$opid}}{{$statusCode}}{{.NameTagOrContentType}}Response{}
+        {{end}}
+    {{end}}
+
+    return fmt.Errorf("handler not implemented")
+}
+{{end}}
