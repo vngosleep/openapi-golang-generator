@@ -101,7 +101,7 @@ type TODOHandler struct {}
 {{range .}}{{.SummaryAsComment }}
 // ({{.Method}} {{.Path}})
 {{$opid := .OperationId -}}
-func (h *TODOHandler) {{$opid}}(ctx context.Context, request {{$opid | ucFirst}}RequestObject) interface{} {
+func (h *TODOHandler) {{$opid}}(ctx context.Context, req {{$opid | ucFirst}}RequestObject) interface{} {
     {{range .Responses}}{{$statusCode := .StatusCode -}}
         {{range .Contents}}
             _ = {{$opid}}{{$statusCode}}{{.NameTagOrContentType}}Response{}
