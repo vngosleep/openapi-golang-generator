@@ -23,6 +23,7 @@ import (
 	"text/template"
 	"unicode"
 
+	"github.com/deepmap/oapi-codegen/pkg/util"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -56,8 +57,11 @@ func (pd *ParameterDefinition) JsonTag() string {
 func (pd *ParameterDefinition) IsJson() bool {
 	p := pd.Spec
 	if len(p.Content) == 1 {
-		_, found := p.Content["application/json"]
-		return found
+		for k := range p.Content {
+			if util.IsMediaTypeJson(k) {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -621,7 +625,7 @@ func GenerateBodyDefinitions(operationID string, bodyOrRef *openapi3.RequestBody
 		var defaultBody bool
 
 		switch {
-		case contentType == "application/json":
+		case util.IsMediaTypeJson(contentType):
 			tag = "JSON"
 			defaultBody = true
 		case strings.HasPrefix(contentType, "multipart/"):
@@ -710,7 +714,7 @@ func GenerateResponseDefinitions(operationID string, responses openapi3.Response
 			content := response.Content[contentType]
 			var tag string
 			switch {
-			case contentType == "application/json":
+			case util.IsMediaTypeJson(contentType):
 				tag = "JSON"
 			case contentType == "application/x-www-form-urlencoded":
 				tag = "Formdata"
@@ -913,8 +917,8 @@ func GenerateGorillaServer(t *template.Template, operations []OperationDefinitio
 
 func GenerateStrictServer(t *template.Template, operations []OperationDefinition, opts Configuration) (string, error) {
 	templates := []string{"strict/strict-interface.tmpl"}
-	if opts.Generate.ChiServer {
-		templates = append(templates, "strict/strict-chi.tmpl")
+	if opts.Generate.ChiServer || opts.Generate.GorillaServer {
+		templates = append(templates, "strict/strict-http.tmpl")
 	}
 	if opts.Generate.EchoServer {
 		templates = append(templates, "strict/strict-echo.tmpl")
