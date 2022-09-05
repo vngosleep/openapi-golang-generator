@@ -146,12 +146,13 @@ type Constants struct {
 //
 // Let's use this example schema:
 // components:
-//  schemas:
-//    Person:
-//      type: object
-//      properties:
-//      name:
-//        type: string
+//
+//	schemas:
+//	  Person:
+//	    type: object
+//	    properties:
+//	    name:
+//	      type: string
 type TypeDefinition struct {
 	// The name of the type, eg, type <...> Person
 	TypeName string
@@ -653,15 +654,17 @@ func GenStructFromSchema(schema Schema) string {
 	// Start out with struct {
 	objectParts := []string{"struct {"}
 
-	if extEmbedValue, ok := schema.OAPISchema.ExtensionProps.Extensions[extPropEmbed]; ok {
-		if embeds, err := extEmbed(extEmbedValue); err == nil {
-			for modelName, tag := range embeds {
-				embedStr := modelName
-				if tag != "" {
-					embedStr = embedStr + " " + "`" + tag + "`"
-				}
+	if schema.OAPISchema != nil && schema.OAPISchema.ExtensionProps.Extensions != nil {
+		if extEmbedValue, ok := schema.OAPISchema.ExtensionProps.Extensions[extPropEmbed]; ok {
+			if embeds, err := extEmbed(extEmbedValue); err == nil {
+				for modelName, tag := range embeds {
+					embedStr := modelName
+					if tag != "" {
+						embedStr = embedStr + " " + "`" + tag + "`"
+					}
 
-				objectParts = append(objectParts, embedStr, "")
+					objectParts = append(objectParts, embedStr, "")
+				}
 			}
 		}
 	}
