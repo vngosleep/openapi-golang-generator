@@ -539,8 +539,7 @@ func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
 // Urls can be supported but this task was out of the scope.
 func GetSwagger() (swagger *openapi3.T, err error) {
 	var resolvePath = PathToRawSpec("")
-
-	openapi3.CircularReferenceCounter = 10
+	
 	loader := openapi3.NewLoader()
 	loader.IsExternalRefsAllowed = true
 	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
