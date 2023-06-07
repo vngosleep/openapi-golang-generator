@@ -425,9 +425,9 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) ListThings(ctx echo.Context) error {
 	var err error
 
-	ctx.Set(BearerAuthScopes, []string{""})
+	ctx.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
+	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ListThings(ctx)
 	return err
 }
@@ -438,7 +438,7 @@ func (w *ServerInterfaceWrapper) AddThing(ctx echo.Context) error {
 
 	ctx.Set(BearerAuthScopes, []string{"things:w"})
 
-	// Invoke the callback with all the unmarshalled arguments
+	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.AddThing(ctx)
 	return err
 }

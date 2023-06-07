@@ -14,10 +14,10 @@
 package codegen
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/token"
 	"net/url"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -34,7 +34,7 @@ var (
 )
 
 func init() {
-	pathParamRE = regexp.MustCompile("{[.;?]?([^{}*]+)\\*?}")
+	pathParamRE = regexp.MustCompile(`{[.;?]?([^{}*]+)\*?}`)
 
 	predeclaredIdentifiers := []string{
 		// Types
@@ -93,7 +93,7 @@ func init() {
 	}
 }
 
-// Uppercase the first character in a string. This assumes UTF-8, so we have
+// UppercaseFirstCharacter Uppercases the first character in a string. This assumes UTF-8, so we have
 // to be careful with unicode, don't treat it as a byte array.
 func UppercaseFirstCharacter(str string) string {
 	if str == "" {
@@ -104,7 +104,26 @@ func UppercaseFirstCharacter(str string) string {
 	return string(runes)
 }
 
-// Same as above, except lower case
+// Uppercase the first character in a identifier with pkg name. This assumes UTF-8, so we have
+// to be careful with unicode, don't treat it as a byte array.
+func UppercaseFirstCharacterWithPkgName(str string) string {
+	if str == "" {
+		return ""
+	}
+
+	segs := strings.Split(str, ".")
+	var prefix string
+	if len(segs) == 2 {
+		prefix = segs[0] + "."
+		str = segs[1]
+	}
+	runes := []rune(str)
+	runes[0] = unicode.ToUpper(runes[0])
+	return prefix + string(runes)
+}
+
+// LowercaseFirstCharacter Lowercases the first character in a string. This assumes UTF-8, so we have
+// to be careful with unicode, don't treat it as a byte array.
 func LowercaseFirstCharacter(str string) string {
 	if str == "" {
 		return ""
@@ -114,7 +133,7 @@ func LowercaseFirstCharacter(str string) string {
 	return string(runes)
 }
 
-// This function will convert query-arg style strings to CamelCase. We will
+// ToCamelCase will convert query-arg style strings to CamelCase. We will
 // use `., -, +, :, ;, _, ~, ' ', (, ), {, }, [, ]` as valid delimiters for words.
 // So, "word.word-word+word:word;word_word~word word(word)word{word}[word]"
 // would be converted to WordWordWordWordWordWordWordWordWordWordWordWordWord
@@ -142,7 +161,25 @@ func ToCamelCase(str string) string {
 	return n
 }
 
-// This function returns the keys of the given SchemaRef dictionary in sorted
+func ToCamelCaseWithInitialism(str string) string {
+	return replaceInitialism(ToCamelCase(str))
+}
+
+func replaceInitialism(s string) string {
+	// These strings do not apply CamelCase
+	// Do not do CamelCase when these characters match when the preceding character is lowercase
+	// ["Acl", "Api", "Ascii", "Cpu", "Css", "Dns", "Eof", "Guid", "Html", "Http", "Https", "Id", "Ip", "Json", "Qps", "Ram", "Rpc", "Sla", "Smtp", "Sql", "Ssh", "Tcp", "Tls", "Ttl", "Udp", "Ui", "Gid", "Uid", "Uuid", "Uri", "Url", "Utf8", "Vm", "Xml", "Xmpp", "Xsrf", "Xss", "Sip", "Rtp", "Amqp", "Db", "Ts"]
+	targetWordRegex := regexp.MustCompile(`(?i)(Acl|Api|Ascii|Cpu|Css|Dns|Eof|Guid|Html|Http|Https|Id|Ip|Json|Qps|Ram|Rpc|Sla|Smtp|Sql|Ssh|Tcp|Tls|Ttl|Udp|Ui|Gid|Uid|Uuid|Uri|Url|Utf8|Vm|Xml|Xmpp|Xsrf|Xss|Sip|Rtp|Amqp|Db|Ts)`)
+	return targetWordRegex.ReplaceAllStringFunc(s, func(s string) string {
+		// If the preceding character is lowercase, do not do CamelCase
+		if unicode.IsLower(rune(s[0])) {
+			return s
+		}
+		return strings.ToUpper(s)
+	})
+}
+
+// SortedSchemaKeys returns the keys of the given SchemaRef dictionary in sorted
 // order, since Golang scrambles dictionary keys
 func SortedSchemaKeys(dict map[string]*openapi3.SchemaRef) []string {
 	keys := make([]string, len(dict))
@@ -155,7 +192,7 @@ func SortedSchemaKeys(dict map[string]*openapi3.SchemaRef) []string {
 	return keys
 }
 
-// This function is the same as above, except it sorts the keys for a Paths
+// SortedPathsKeys is the same as above, except it sorts the keys for a Paths
 // dictionary.
 func SortedPathsKeys(dict openapi3.Paths) []string {
 	keys := make([]string, len(dict))
@@ -168,7 +205,7 @@ func SortedPathsKeys(dict openapi3.Paths) []string {
 	return keys
 }
 
-// This function returns Operation dictionary keys in sorted order
+// SortedOperationsKeys returns Operation dictionary keys in sorted order
 func SortedOperationsKeys(dict map[string]*openapi3.Operation) []string {
 	keys := make([]string, len(dict))
 	i := 0
@@ -180,7 +217,7 @@ func SortedOperationsKeys(dict map[string]*openapi3.Operation) []string {
 	return keys
 }
 
-// This function returns Responses dictionary keys in sorted order
+// SortedResponsesKeys returns Responses dictionary keys in sorted order
 func SortedResponsesKeys(dict openapi3.Responses) []string {
 	keys := make([]string, len(dict))
 	i := 0
@@ -203,7 +240,7 @@ func SortedHeadersKeys(dict openapi3.Headers) []string {
 	return keys
 }
 
-// This returns Content dictionary keys in sorted order
+// SortedContentKeys returns Content dictionary keys in sorted order
 func SortedContentKeys(dict openapi3.Content) []string {
 	keys := make([]string, len(dict))
 	i := 0
@@ -215,7 +252,7 @@ func SortedContentKeys(dict openapi3.Content) []string {
 	return keys
 }
 
-// This returns string map keys in sorted order
+// SortedStringKeys returns string map keys in sorted order
 func SortedStringKeys(dict map[string]string) []string {
 	keys := make([]string, len(dict))
 	i := 0
@@ -227,7 +264,7 @@ func SortedStringKeys(dict map[string]string) []string {
 	return keys
 }
 
-// This returns sorted keys for a ParameterRef dict
+// SortedParameterKeys returns sorted keys for a ParameterRef dict
 func SortedParameterKeys(dict map[string]*openapi3.ParameterRef) []string {
 	keys := make([]string, len(dict))
 	i := 0
@@ -261,7 +298,7 @@ func SortedSecurityRequirementKeys(sr openapi3.SecurityRequirement) []string {
 	return keys
 }
 
-// This function checks whether the specified string is present in an array
+// StringInArray checks whether the specified string is present in an array
 // of strings
 func StringInArray(str string, array []string) bool {
 	for _, elt := range array {
@@ -270,6 +307,23 @@ func StringInArray(str string, array []string) bool {
 		}
 	}
 	return false
+}
+
+// RefPathToObjName returns the name of referenced object without changes.
+//
+//	#/components/schemas/Foo -> Foo
+//	#/components/parameters/Bar -> Bar
+//	#/components/responses/baz_baz -> baz_baz
+//	document.json#/Foo -> Foo
+//	http://deepmap.com/schemas/document.json#/objObj -> objObj
+//
+// Does not check refPath correctness.
+func RefPathToObjName(refPath string) string {
+	parts := strings.Split(refPath, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
 }
 
 // RefPathToGoType takes a $ref value and converts it to a Go typename.
@@ -315,7 +369,7 @@ func refPathToGoType(refPath string, local bool) (string, error) {
 		return "", fmt.Errorf("unsupported reference: %s", refPath)
 	}
 	remoteComponent, flatComponent := pathParts[0], pathParts[1]
-	if goImport, ok := importMapping[remoteComponent]; !ok {
+	if goImport, ok := globalState.importMapping[remoteComponent]; !ok {
 		return "", fmt.Errorf("unrecognized external reference '%s'; please provide the known import for this reference using option --import-mapping", remoteComponent)
 	} else {
 		goType, err := refPathToGoType("#"+flatComponent, false)
@@ -330,8 +384,7 @@ func refPathToGoType(refPath string, local bool) (string, error) {
 // #/components/schemas/Foo                     -> true
 // ./local/file.yml#/components/parameters/Bar  -> true
 // ./local/file.yml                             -> false
-// The function can be used to check whether RefPathToGoType($ref) is possible.
-//
+// IsGoTypeReference can be used to check whether RefPathToGoType($ref) is possible.
 func IsGoTypeReference(ref string) bool {
 	return ref != "" && !IsWholeDocumentReference(ref)
 }
@@ -342,22 +395,22 @@ func IsGoTypeReference(ref string) bool {
 // ./local/file.yml                                     -> true
 // http://deepmap.com/schemas/document.json             -> true
 // http://deepmap.com/schemas/document.json#/Foo        -> false
-//
 func IsWholeDocumentReference(ref string) bool {
 	return ref != "" && !strings.ContainsAny(ref, "#")
 }
 
-// SwaggerUriToEchoUri converts a OpenAPI style path URI with parameters to a
+// SwaggerUriToEchoUri converts a OpenAPI style path URI with parameters to an
 // Echo compatible path URI. We need to replace all of OpenAPI parameters with
 // ":param". Valid input parameters are:
-//   {param}
-//   {param*}
-//   {.param}
-//   {.param*}
-//   {;param}
-//   {;param*}
-//   {?param}
-//   {?param*}
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
 func SwaggerUriToEchoUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
@@ -365,64 +418,84 @@ func SwaggerUriToEchoUri(uri string) string {
 // SwaggerUriToEchoUri converts a OpenAPI style path URI with parameters to a
 // Echo compatible path URI. We need to replace all of OpenAPI parameters with
 // ":param". Valid input parameters are:
-//   {param}
-//   {param*}
-//   {.param}
-//   {.param*}
-//   {;param}
-//   {;param*}
-//   {?param}
-//   {?param*}
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
 func SwaggerUriToBunUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
+// SwaggerUriToFiberUri converts a OpenAPI style path URI with parameters to a
+// Fiber compatible path URI. We need to replace all of OpenAPI parameters with
+// ":param". Valid input parameters are:
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
+func SwaggerUriToFiberUri(uri string) string {
+	return pathParamRE.ReplaceAllString(uri, ":$1")
+}
+
 // SwaggerUriToChiUri converts a swagger style path URI with parameters to a
-// Chi compatible path URI. We need to replace all of Swagger parameters with
+// Chi compatible path URI. We need to replace all Swagger parameters with
 // "{param}". Valid input parameters are:
-//   {param}
-//   {param*}
-//   {.param}
-//   {.param*}
-//   {;param}
-//   {;param*}
-//   {?param}
-//   {?param*}
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
 func SwaggerUriToChiUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, "{$1}")
 }
 
-// This function converts a swagger style path URI with parameters to a
-// Gin compatible path URI. We need to replace all of Swagger parameters with
+// SwaggerUriToGinUri converts a swagger style path URI with parameters to a
+// Gin compatible path URI. We need to replace all Swagger parameters with
 // ":param". Valid input parameters are:
-//   {param}
-//   {param*}
-//   {.param}
-//   {.param*}
-//   {;param}
-//   {;param*}
-//   {?param}
-//   {?param*}
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
 func SwaggerUriToGinUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, ":$1")
 }
 
-// This function converts a swagger style path URI with parameters to a
-// Gorilla compatible path URI. We need to replace all of Swagger parameters with
+// SwaggerUriToGorillaUri converts a swagger style path URI with parameters to a
+// Gorilla compatible path URI. We need to replace all Swagger parameters with
 // ":param". Valid input parameters are:
-//   {param}
-//   {param*}
-//   {.param}
-//   {.param*}
-//   {;param}
-//   {;param*}
-//   {?param}
-//   {?param*}
+//
+//	{param}
+//	{param*}
+//	{.param}
+//	{.param*}
+//	{;param}
+//	{;param*}
+//	{?param}
+//	{?param*}
 func SwaggerUriToGorillaUri(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, "{$1}")
 }
 
-// Returns the argument names, in order, in a given URI string, so for
+// OrderedParamsFromUri returns the argument names, in order, in a given URI string, so for
 // /path/{param1}/{.param2*}/{?param3}, it would return param1, param2, param3
 func OrderedParamsFromUri(uri string) []string {
 	matches := pathParamRE.FindAllStringSubmatch(uri, -1)
@@ -433,12 +506,12 @@ func OrderedParamsFromUri(uri string) []string {
 	return result
 }
 
-// Replaces path parameters of the form {param} with %s
+// ReplacePathParamsWithStr replaces path parameters of the form {param} with %s
 func ReplacePathParamsWithStr(uri string) string {
 	return pathParamRE.ReplaceAllString(uri, "%s")
 }
 
-// Reorders the given parameter definitions to match those in the path URI.
+// SortParamsByPath reorders the given parameter definitions to match those in the path URI.
 func SortParamsByPath(path string, in []ParameterDefinition) ([]ParameterDefinition, error) {
 	pathParams := OrderedParamsFromUri(path)
 	n := len(in)
@@ -458,13 +531,13 @@ func SortParamsByPath(path string, in []ParameterDefinition) ([]ParameterDefinit
 	return out, nil
 }
 
-// Returns whether the given string is a go keyword
+// IsGoKeyword returns whether the given string is a go keyword
 func IsGoKeyword(str string) bool {
 	return token.IsKeyword(str)
 }
 
 // IsPredeclaredGoIdentifier returns whether the given string
-// is a predefined go indentifier.
+// is a predefined go identifier.
 //
 // See https://golang.org/ref/spec#Predeclared_identifiers
 func IsPredeclaredGoIdentifier(str string) bool {
@@ -532,13 +605,17 @@ func SanitizeGoIdentity(str string) string {
 
 // SanitizeEnumNames fixes illegal chars in the enum names
 // and removes duplicates
-func SanitizeEnumNames(enumNames []string) map[string]string {
-	dupCheck := make(map[string]int, len(enumNames))
-	deDup := make([]string, 0, len(enumNames))
+func SanitizeEnumNames(enumNames, enumValues []string) map[string]string {
+	dupCheck := make(map[string]int, len(enumValues))
+	deDup := make([][]string, 0, len(enumValues))
 
-	for _, n := range enumNames {
+	for i, v := range enumValues {
+		n := v
+		if i < len(enumNames) {
+			n = enumNames[i]
+		}
 		if _, dup := dupCheck[n]; !dup {
-			deDup = append(deDup, n)
+			deDup = append(deDup, []string{n, v})
 		}
 		dupCheck[n] = 0
 	}
@@ -546,13 +623,14 @@ func SanitizeEnumNames(enumNames []string) map[string]string {
 	dupCheck = make(map[string]int, len(deDup))
 	sanitizedDeDup := make(map[string]string, len(deDup))
 
-	for _, n := range deDup {
+	for _, p := range deDup {
+		n, v := p[0], p[1]
 		sanitized := SanitizeGoIdentity(SchemaNameToTypeName(n))
 
 		if _, dup := dupCheck[sanitized]; !dup {
-			sanitizedDeDup[sanitized] = n
+			sanitizedDeDup[sanitized] = v
 		} else {
-			sanitizedDeDup[sanitized+strconv.Itoa(dupCheck[sanitized])] = n
+			sanitizedDeDup[sanitized+strconv.Itoa(dupCheck[sanitized])] = v
 		}
 		dupCheck[sanitized]++
 	}
@@ -619,17 +697,17 @@ func SchemaNameToTypeName(name string) string {
 // you must specify an additionalProperties type
 // If additionalProperties it true/false, this field will be non-nil.
 func SchemaHasAdditionalProperties(schema *openapi3.Schema) bool {
-	if schema.AdditionalPropertiesAllowed != nil && *schema.AdditionalPropertiesAllowed {
+	if schema.AdditionalProperties.Has != nil && *schema.AdditionalProperties.Has {
 		return true
 	}
 
-	if schema.AdditionalProperties != nil {
+	if schema.AdditionalProperties.Schema != nil {
 		return true
 	}
 	return false
 }
 
-// This converts a path, like Object/field1/nestedField into a go
+// PathToTypeName converts a path, like Object/field1/nestedField into a go
 // type name.
 func PathToTypeName(path []string) string {
 	for i, p := range path {
@@ -651,14 +729,23 @@ func StringWithTypeNameToGoComment(in, typeName string) string {
 	return stringToGoCommentWithPrefix(in, typeName)
 }
 
+func DeprecationComment(reason string) string {
+	var content = "Deprecated:" // The colon is required at the end even without reason
+	if reason != "" {
+		content += fmt.Sprintf(" %s", reason)
+	}
+
+	return stringToGoCommentWithPrefix(content, "")
+}
+
 func stringToGoCommentWithPrefix(in, prefix string) string {
 	if len(in) == 0 || len(strings.TrimSpace(in)) == 0 { // ignore empty comment
 		return ""
 	}
 
 	// Normalize newlines from Windows/Mac to Linux
-	in = strings.Replace(in, "\r\n", "\n", -1)
-	in = strings.Replace(in, "\r", "\n", -1)
+	in = strings.ReplaceAll(in, "\r\n", "\n")
+	in = strings.ReplaceAll(in, "\r", "\n")
 
 	// Add comment to each line
 	var lines []string
@@ -677,7 +764,7 @@ func stringToGoCommentWithPrefix(in, prefix string) string {
 	return in
 }
 
-// This function breaks apart a path, and looks at each element. If it's
+// EscapePathElements breaks apart a path, and looks at each element. If it's
 // not a path parameter, eg, {param}, it will URL-escape the element.
 func EscapePathElements(path string) string {
 	elems := strings.Split(path, "/")
@@ -806,27 +893,51 @@ func findSchemaNameByRefPath(refPath string, spec *openapi3.T) (string, error) {
 	return "", nil
 }
 
-func GetImports(dict map[string]*openapi3.SchemaRef) (map[string]goImport, error) {
-	res := map[string]goImport{}
-	for _, v := range dict {
-		if v == nil || v.Value == nil {
-			continue
-		}
+func ParseGoImportExtension(v *openapi3.SchemaRef) (*goImport, error) {
+	if v.Value.Extensions[extPropGoImport] == nil || v.Value.Extensions[extPropGoType] == nil {
+		return nil, nil
+	}
 
-		if v.Value.Extensions["x-go-type-import"] == nil || v.Value.Extensions["x-go-type"] == nil {
-			continue
-		}
-		goTypeImportExt := v.Value.Extensions["x-go-type-import"]
+	goTypeImportExt := v.Value.Extensions[extPropGoImport]
 
-		if raw, ok := goTypeImportExt.(json.RawMessage); ok {
-			gi := goImport{}
-			if err := json.Unmarshal(raw, &gi); err != nil {
-				return nil, err
+	importI, ok := goTypeImportExt.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("failed to convert type: %T", goTypeImportExt)
+	}
+
+	gi := goImport{}
+	// replicate the case-insensitive field mapping json.Unmarshal would do
+	for k, v := range importI {
+		if strings.EqualFold(k, "name") {
+			if vs, ok := v.(string); ok {
+				gi.Name = vs
+			} else {
+				return nil, fmt.Errorf("failed to convert type: %T", v)
 			}
-			res[gi.String()] = gi
-		} else {
-			continue
+		} else if strings.EqualFold(k, "path") {
+			if vs, ok := v.(string); ok {
+				gi.Path = vs
+			} else {
+				return nil, fmt.Errorf("failed to convert type: %T", v)
+			}
 		}
 	}
-	return res, nil
+
+	return &gi, nil
+}
+
+func MergeImports(dst, src map[string]goImport) {
+	for k, v := range src {
+		dst[k] = v
+	}
+}
+
+// TypeDefinitionsEquivalent checks for equality between two type definitions, but
+// not every field is considered. We only want to know if they are fundamentally
+// the same type.
+func TypeDefinitionsEquivalent(t1, t2 TypeDefinition) bool {
+	if t1.TypeName != t2.TypeName {
+		return false
+	}
+	return reflect.DeepEqual(t1.Schema.OAPISchema, t2.Schema.OAPISchema)
 }

@@ -25,13 +25,12 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/deepmap/oapi-codegen/pkg/testutil"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/deepmap/oapi-codegen/pkg/testutil"
 )
 
 //go:embed test_spec.yaml
@@ -199,14 +198,14 @@ func TestOapiRequestValidator(t *testing.T) {
 	{
 		rec := doGet(t, g, "http://deepmap.ai/protected_resource_401")
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Equal(t, "test: error in openapi3filter.SecurityRequirementsError: Security requirements failed", rec.Body.String())
+		assert.Equal(t, "test: error in openapi3filter.SecurityRequirementsError: security requirements failed: unauthorized", rec.Body.String())
 		assert.False(t, called, "Handler should not have been called")
 		called = false
 	}
 }
 
 func TestOapiRequestValidatorWithOptionsMultiError(t *testing.T) {
-	swagger, err := openapi3.NewLoader().LoadFromData([]byte(testSchema))
+	swagger, err := openapi3.NewLoader().LoadFromData(testSchema)
 	require.NoError(t, err, "Error initializing swagger")
 
 	g := gin.New()
@@ -309,7 +308,7 @@ func TestOapiRequestValidatorWithOptionsMultiError(t *testing.T) {
 }
 
 func TestOapiRequestValidatorWithOptionsMultiErrorAndCustomHandler(t *testing.T) {
-	swagger, err := openapi3.NewLoader().LoadFromData([]byte(testSchema))
+	swagger, err := openapi3.NewLoader().LoadFromData(testSchema)
 	require.NoError(t, err, "Error initializing swagger")
 
 	g := gin.New()

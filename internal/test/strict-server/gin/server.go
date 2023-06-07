@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 )
@@ -94,9 +95,26 @@ func (s StrictServer) URLEncodedExample(ctx context.Context, request URLEncodedE
 }
 
 func (s StrictServer) HeadersExample(ctx context.Context, request HeadersExampleRequestObject) (HeadersExampleResponseObject, error) {
-	return HeadersExample200JSONResponse{Body: Example(*request.Body), Headers: HeadersExample200ResponseHeaders{Header1: request.Params.Header1, Header2: *request.Params.Header2}}, nil
+	return HeadersExample200JSONResponse{Body: *request.Body, Headers: HeadersExample200ResponseHeaders{Header1: request.Params.Header1, Header2: *request.Params.Header2}}, nil
 }
 
 func (s StrictServer) ReusableResponses(ctx context.Context, request ReusableResponsesRequestObject) (ReusableResponsesResponseObject, error) {
-	return ReusableResponses200JSONResponse{Body: *request.Body}, nil
+	return ReusableResponses200JSONResponse{ReusableresponseJSONResponse: ReusableresponseJSONResponse{Body: *request.Body}}, nil
+}
+
+func (s StrictServer) ReservedGoKeywordParameters(ctx context.Context, request ReservedGoKeywordParametersRequestObject) (ReservedGoKeywordParametersResponseObject, error) {
+	return ReservedGoKeywordParameters200TextResponse(""), nil
+}
+
+func (s StrictServer) UnionExample(ctx context.Context, request UnionExampleRequestObject) (UnionExampleResponseObject, error) {
+	union, err := json.Marshal(*request.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return UnionExample200JSONResponse{
+		Body: struct{ union json.RawMessage }{
+			union: union,
+		},
+	}, nil
 }
