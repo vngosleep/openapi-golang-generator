@@ -66,6 +66,9 @@ type URLEncodedExampleFormdataRequestBody = Example
 // HeadersExampleJSONRequestBody defines body for HeadersExample for application/json ContentType.
 type HeadersExampleJSONRequestBody = Example
 
+// UnionExampleJSONRequestBody defines body for UnionExample for application/json ContentType.
+type UnionExampleJSONRequestBody = Example
+
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -156,6 +159,9 @@ type ClientInterface interface {
 
 	MultipleRequestAndResponseTypesWithTextBody(ctx context.Context, body MultipleRequestAndResponseTypesTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ReservedGoKeywordParameters request
+	ReservedGoKeywordParameters(ctx context.Context, pType string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ReusableResponses request with any body
 	ReusableResponsesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -181,6 +187,11 @@ type ClientInterface interface {
 	HeadersExampleWithBody(ctx context.Context, params *HeadersExampleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	HeadersExample(ctx context.Context, params *HeadersExampleParams, body HeadersExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnionExample request with any body
+	UnionExampleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UnionExample(ctx context.Context, body UnionExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) JSONExampleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -257,6 +268,18 @@ func (c *Client) MultipleRequestAndResponseTypesWithFormdataBody(ctx context.Con
 
 func (c *Client) MultipleRequestAndResponseTypesWithTextBody(ctx context.Context, body MultipleRequestAndResponseTypesTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMultipleRequestAndResponseTypesRequestWithTextBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReservedGoKeywordParameters(ctx context.Context, pType string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReservedGoKeywordParametersRequest(c.Server, pType)
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +400,30 @@ func (c *Client) HeadersExampleWithBody(ctx context.Context, params *HeadersExam
 
 func (c *Client) HeadersExample(ctx context.Context, params *HeadersExampleParams, body HeadersExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHeadersExampleRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UnionExampleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnionExampleRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UnionExample(ctx context.Context, body UnionExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnionExampleRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -510,6 +557,40 @@ func NewMultipleRequestAndResponseTypesRequestWithBody(server string, contentTyp
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewReservedGoKeywordParametersRequest generates requests for ReservedGoKeywordParameters
+func NewReservedGoKeywordParametersRequest(server string, pType string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/reserved-go-keyword-parameters/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -748,6 +829,46 @@ func NewHeadersExampleRequestWithBody(server string, params *HeadersExampleParam
 	return req, nil
 }
 
+// NewUnionExampleRequest calls the generic UnionExample builder with application/json body
+func NewUnionExampleRequest(server string, body UnionExampleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUnionExampleRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUnionExampleRequestWithBody generates requests for UnionExample with any type of body
+func NewUnionExampleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/with-union")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -808,6 +929,9 @@ type ClientWithResponsesInterface interface {
 
 	MultipleRequestAndResponseTypesWithTextBodyWithResponse(ctx context.Context, body MultipleRequestAndResponseTypesTextRequestBody, reqEditors ...RequestEditorFn) (*MultipleRequestAndResponseTypesResponse, error)
 
+	// ReservedGoKeywordParameters request
+	ReservedGoKeywordParametersWithResponse(ctx context.Context, pType string, reqEditors ...RequestEditorFn) (*ReservedGoKeywordParametersResponse, error)
+
 	// ReusableResponses request with any body
 	ReusableResponsesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReusableResponsesResponse, error)
 
@@ -833,6 +957,11 @@ type ClientWithResponsesInterface interface {
 	HeadersExampleWithBodyWithResponse(ctx context.Context, params *HeadersExampleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*HeadersExampleResponse, error)
 
 	HeadersExampleWithResponse(ctx context.Context, params *HeadersExampleParams, body HeadersExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*HeadersExampleResponse, error)
+
+	// UnionExample request with any body
+	UnionExampleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnionExampleResponse, error)
+
+	UnionExampleWithResponse(ctx context.Context, body UnionExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*UnionExampleResponse, error)
 }
 
 type JSONExampleResponse struct {
@@ -894,6 +1023,27 @@ func (r MultipleRequestAndResponseTypesResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r MultipleRequestAndResponseTypesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ReservedGoKeywordParametersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReservedGoKeywordParametersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReservedGoKeywordParametersResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1028,6 +1178,30 @@ func (r HeadersExampleResponse) StatusCode() int {
 	return 0
 }
 
+type UnionExampleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		union json.RawMessage
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r UnionExampleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnionExampleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // JSONExampleWithBodyWithResponse request with arbitrary body returning *JSONExampleResponse
 func (c *ClientWithResponses) JSONExampleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*JSONExampleResponse, error) {
 	rsp, err := c.JSONExampleWithBody(ctx, contentType, body, reqEditors...)
@@ -1085,6 +1259,15 @@ func (c *ClientWithResponses) MultipleRequestAndResponseTypesWithTextBodyWithRes
 		return nil, err
 	}
 	return ParseMultipleRequestAndResponseTypesResponse(rsp)
+}
+
+// ReservedGoKeywordParametersWithResponse request returning *ReservedGoKeywordParametersResponse
+func (c *ClientWithResponses) ReservedGoKeywordParametersWithResponse(ctx context.Context, pType string, reqEditors ...RequestEditorFn) (*ReservedGoKeywordParametersResponse, error) {
+	rsp, err := c.ReservedGoKeywordParameters(ctx, pType, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReservedGoKeywordParametersResponse(rsp)
 }
 
 // ReusableResponsesWithBodyWithResponse request with arbitrary body returning *ReusableResponsesResponse
@@ -1173,6 +1356,23 @@ func (c *ClientWithResponses) HeadersExampleWithResponse(ctx context.Context, pa
 	return ParseHeadersExampleResponse(rsp)
 }
 
+// UnionExampleWithBodyWithResponse request with arbitrary body returning *UnionExampleResponse
+func (c *ClientWithResponses) UnionExampleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UnionExampleResponse, error) {
+	rsp, err := c.UnionExampleWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnionExampleResponse(rsp)
+}
+
+func (c *ClientWithResponses) UnionExampleWithResponse(ctx context.Context, body UnionExampleJSONRequestBody, reqEditors ...RequestEditorFn) (*UnionExampleResponse, error) {
+	rsp, err := c.UnionExample(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnionExampleResponse(rsp)
+}
+
 // ParseJSONExampleResponse parses an HTTP response from a JSONExampleWithResponse call
 func ParseJSONExampleResponse(rsp *http.Response) (*JSONExampleResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1239,6 +1439,22 @@ func ParseMultipleRequestAndResponseTypesResponse(rsp *http.Response) (*Multiple
 	case rsp.StatusCode == 200:
 		// Content-type (text/plain) unsupported
 
+	}
+
+	return response, nil
+}
+
+// ParseReservedGoKeywordParametersResponse parses an HTTP response from a ReservedGoKeywordParametersWithResponse call
+func ParseReservedGoKeywordParametersResponse(rsp *http.Response) (*ReservedGoKeywordParametersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReservedGoKeywordParametersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -1350,6 +1566,34 @@ func ParseHeadersExampleResponse(rsp *http.Response) (*HeadersExampleResponse, e
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Example
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnionExampleResponse parses an HTTP response from a UnionExampleWithResponse call
+func ParseUnionExampleResponse(rsp *http.Response) (*UnionExampleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnionExampleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			union json.RawMessage
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

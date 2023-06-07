@@ -34,6 +34,9 @@ type ServerInterface interface {
 	// (POST /multiple)
 	MultipleRequestAndResponseTypes(c *gin.Context)
 
+	// (GET /reserved-go-keyword-parameters/{type})
+	ReservedGoKeywordParameters(c *gin.Context, pType string)
+
 	// (POST /reusable-responses)
 	ReusableResponses(c *gin.Context)
 
@@ -51,12 +54,16 @@ type ServerInterface interface {
 
 	// (POST /with-headers)
 	HeadersExample(c *gin.Context, params HeadersExampleParams)
+
+	// (POST /with-union)
+	UnionExample(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler            ServerInterface
 	HandlerMiddlewares []MiddlewareFunc
+	ErrorHandler       func(*gin.Context, error, int)
 }
 
 type MiddlewareFunc func(c *gin.Context)
@@ -66,6 +73,9 @@ func (siw *ServerInterfaceWrapper) JSONExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.JSONExample(c)
@@ -76,6 +86,9 @@ func (siw *ServerInterfaceWrapper) MultipartExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.MultipartExample(c)
@@ -86,9 +99,36 @@ func (siw *ServerInterfaceWrapper) MultipleRequestAndResponseTypes(c *gin.Contex
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.MultipleRequestAndResponseTypes(c)
+}
+
+// ReservedGoKeywordParameters operation middleware
+func (siw *ServerInterfaceWrapper) ReservedGoKeywordParameters(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "type" -------------
+	var pType string
+
+	err = runtime.BindStyledParameter("simple", false, "type", c.Param("type"), &pType)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter type: %s", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ReservedGoKeywordParameters(c, pType)
 }
 
 // ReusableResponses operation middleware
@@ -96,6 +136,9 @@ func (siw *ServerInterfaceWrapper) ReusableResponses(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.ReusableResponses(c)
@@ -106,6 +149,9 @@ func (siw *ServerInterfaceWrapper) TextExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.TextExample(c)
@@ -116,6 +162,9 @@ func (siw *ServerInterfaceWrapper) UnknownExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.UnknownExample(c)
@@ -126,6 +175,9 @@ func (siw *ServerInterfaceWrapper) UnspecifiedContentType(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.UnspecifiedContentType(c)
@@ -136,6 +188,9 @@ func (siw *ServerInterfaceWrapper) URLEncodedExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.URLEncodedExample(c)
@@ -156,20 +211,20 @@ func (siw *ServerInterfaceWrapper) HeadersExample(c *gin.Context) {
 		var Header1 string
 		n := len(valueList)
 		if n != 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": fmt.Sprintf("Expected one value for header1, got %d", n)})
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for header1, got %d", n), http.StatusBadRequest)
 			return
 		}
 
 		err = runtime.BindStyledParameterWithLocation("simple", false, "header1", runtime.ParamLocationHeader, valueList[0], &Header1)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": fmt.Sprintf("Invalid format for parameter header1: %s", err)})
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter header1: %s", err), http.StatusBadRequest)
 			return
 		}
 
 		params.Header1 = Header1
 
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": fmt.Sprintf("Header parameter header1 is required, but not found: %s", err)})
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter header1 is required, but not found"), http.StatusBadRequest)
 		return
 	}
 
@@ -178,13 +233,13 @@ func (siw *ServerInterfaceWrapper) HeadersExample(c *gin.Context) {
 		var Header2 int
 		n := len(valueList)
 		if n != 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": fmt.Sprintf("Expected one value for header2, got %d", n)})
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for header2, got %d", n), http.StatusBadRequest)
 			return
 		}
 
 		err = runtime.BindStyledParameterWithLocation("simple", false, "header2", runtime.ParamLocationHeader, valueList[0], &Header2)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": fmt.Sprintf("Invalid format for parameter header2: %s", err)})
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter header2: %s", err), http.StatusBadRequest)
 			return
 		}
 
@@ -194,48 +249,65 @@ func (siw *ServerInterfaceWrapper) HeadersExample(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
+		if c.IsAborted() {
+			return
+		}
 	}
 
 	siw.Handler.HeadersExample(c, params)
 }
 
+// UnionExample operation middleware
+func (siw *ServerInterfaceWrapper) UnionExample(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UnionExample(c)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
-	BaseURL     string
-	Middlewares []MiddlewareFunc
+	BaseURL      string
+	Middlewares  []MiddlewareFunc
+	ErrorHandler func(*gin.Context, error, int)
 }
 
 // RegisterHandlers creates http.Handler with routing matching OpenAPI spec.
-func RegisterHandlers(router *gin.Engine, si ServerInterface) *gin.Engine {
-	return RegisterHandlersWithOptions(router, si, GinServerOptions{})
+func RegisterHandlers(router gin.IRouter, si ServerInterface) {
+	RegisterHandlersWithOptions(router, si, GinServerOptions{})
 }
 
 // RegisterHandlersWithOptions creates http.Handler with additional options
-func RegisterHandlersWithOptions(router *gin.Engine, si ServerInterface, options GinServerOptions) *gin.Engine {
+func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options GinServerOptions) {
+	errorHandler := options.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = func(c *gin.Context, err error, statusCode int) {
+			c.JSON(statusCode, gin.H{"msg": err.Error()})
+		}
+	}
+
 	wrapper := ServerInterfaceWrapper{
 		Handler:            si,
 		HandlerMiddlewares: options.Middlewares,
+		ErrorHandler:       errorHandler,
 	}
 
 	router.POST(options.BaseURL+"/json", wrapper.JSONExample)
-
 	router.POST(options.BaseURL+"/multipart", wrapper.MultipartExample)
-
 	router.POST(options.BaseURL+"/multiple", wrapper.MultipleRequestAndResponseTypes)
-
+	router.GET(options.BaseURL+"/reserved-go-keyword-parameters/:type", wrapper.ReservedGoKeywordParameters)
 	router.POST(options.BaseURL+"/reusable-responses", wrapper.ReusableResponses)
-
 	router.POST(options.BaseURL+"/text", wrapper.TextExample)
-
 	router.POST(options.BaseURL+"/unknown", wrapper.UnknownExample)
-
 	router.POST(options.BaseURL+"/unspecified-content-type", wrapper.UnspecifiedContentType)
-
 	router.POST(options.BaseURL+"/urlencoded", wrapper.URLEncodedExample)
-
 	router.POST(options.BaseURL+"/with-headers", wrapper.HeadersExample)
-
-	return router
+	router.POST(options.BaseURL+"/with-union", wrapper.UnionExample)
 }
 
 type BadrequestResponse struct {
@@ -401,6 +473,24 @@ func (response MultipleRequestAndResponseTypes400Response) VisitMultipleRequestA
 	return nil
 }
 
+type ReservedGoKeywordParametersRequestObject struct {
+	Type string `json:"type"`
+}
+
+type ReservedGoKeywordParametersResponseObject interface {
+	VisitReservedGoKeywordParametersResponse(w http.ResponseWriter) error
+}
+
+type ReservedGoKeywordParameters200TextResponse string
+
+func (response ReservedGoKeywordParameters200TextResponse) VisitReservedGoKeywordParametersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
+}
+
 type ReusableResponsesRequestObject struct {
 	Body *ReusableResponsesJSONRequestBody
 }
@@ -409,7 +499,7 @@ type ReusableResponsesResponseObject interface {
 	VisitReusableResponsesResponse(w http.ResponseWriter) error
 }
 
-type ReusableResponses200JSONResponse = ReusableresponseJSONResponse
+type ReusableResponses200JSONResponse struct{ ReusableresponseJSONResponse }
 
 func (response ReusableResponses200JSONResponse) VisitReusableResponsesResponse(w http.ResponseWriter) error {
 	w.Header().Set("header1", fmt.Sprint(response.Headers.Header1))
@@ -656,6 +746,51 @@ func (response HeadersExampledefaultResponse) VisitHeadersExampleResponse(w http
 	return nil
 }
 
+type UnionExampleRequestObject struct {
+	Body *UnionExampleJSONRequestBody
+}
+
+type UnionExampleResponseObject interface {
+	VisitUnionExampleResponse(w http.ResponseWriter) error
+}
+
+type UnionExample200ResponseHeaders struct {
+	Header1 string
+	Header2 int
+}
+
+type UnionExample200JSONResponse struct {
+	Body struct {
+		union json.RawMessage
+	}
+	Headers UnionExample200ResponseHeaders
+}
+
+func (response UnionExample200JSONResponse) VisitUnionExampleResponse(w http.ResponseWriter) error {
+	w.Header().Set("header1", fmt.Sprint(response.Headers.Header1))
+	w.Header().Set("header2", fmt.Sprint(response.Headers.Header2))
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response.Body.union)
+}
+
+type UnionExample400Response = BadrequestResponse
+
+func (response UnionExample400Response) VisitUnionExampleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type UnionExampledefaultResponse struct {
+	StatusCode int
+}
+
+func (response UnionExampledefaultResponse) VisitUnionExampleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(response.StatusCode)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -667,6 +802,9 @@ type StrictServerInterface interface {
 
 	// (POST /multiple)
 	MultipleRequestAndResponseTypes(ctx context.Context, request MultipleRequestAndResponseTypesRequestObject) (MultipleRequestAndResponseTypesResponseObject, error)
+
+	// (GET /reserved-go-keyword-parameters/{type})
+	ReservedGoKeywordParameters(ctx context.Context, request ReservedGoKeywordParametersRequestObject) (ReservedGoKeywordParametersResponseObject, error)
 
 	// (POST /reusable-responses)
 	ReusableResponses(ctx context.Context, request ReusableResponsesRequestObject) (ReusableResponsesResponseObject, error)
@@ -685,11 +823,13 @@ type StrictServerInterface interface {
 
 	// (POST /with-headers)
 	HeadersExample(ctx context.Context, request HeadersExampleRequestObject) (HeadersExampleResponseObject, error)
+
+	// (POST /with-union)
+	UnionExample(ctx context.Context, request UnionExampleRequestObject) (UnionExampleResponseObject, error)
 }
 
-type StrictHandlerFunc func(ctx *gin.Context, args interface{}) (interface{}, error)
-
-type StrictMiddlewareFunc func(f StrictHandlerFunc, operationID string) StrictHandlerFunc
+type StrictHandlerFunc = runtime.StrictGinHandlerFunc
+type StrictMiddlewareFunc = runtime.StrictGinMiddlewareFunc
 
 func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc) ServerInterface {
 	return &strictHandler{ssi: ssi, middlewares: middlewares}
@@ -705,7 +845,8 @@ func (sh *strictHandler) JSONExample(ctx *gin.Context) {
 	var request JSONExampleRequestObject
 
 	var body JSONExampleJSONRequestBody
-	if err := ctx.Bind(&body); err != nil {
+	if err := ctx.ShouldBind(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
 		ctx.Error(err)
 		return
 	}
@@ -722,6 +863,7 @@ func (sh *strictHandler) JSONExample(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(JSONExampleResponseObject); ok {
 		if err := validResponse.VisitJSONExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -753,6 +895,7 @@ func (sh *strictHandler) MultipartExample(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(MultipartExampleResponseObject); ok {
 		if err := validResponse.VisitMultipartExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -768,7 +911,8 @@ func (sh *strictHandler) MultipleRequestAndResponseTypes(ctx *gin.Context) {
 
 	if strings.HasPrefix(ctx.GetHeader("Content-Type"), "application/json") {
 		var body MultipleRequestAndResponseTypesJSONRequestBody
-		if err := ctx.Bind(&body); err != nil {
+		if err := ctx.ShouldBind(&body); err != nil {
+			ctx.Status(http.StatusBadRequest)
 			ctx.Error(err)
 			return
 		}
@@ -818,8 +962,36 @@ func (sh *strictHandler) MultipleRequestAndResponseTypes(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(MultipleRequestAndResponseTypesResponseObject); ok {
 		if err := validResponse.VisitMultipleRequestAndResponseTypesResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("Unexpected response type: %T", response))
+	}
+}
+
+// ReservedGoKeywordParameters operation middleware
+func (sh *strictHandler) ReservedGoKeywordParameters(ctx *gin.Context, pType string) {
+	var request ReservedGoKeywordParametersRequestObject
+
+	request.Type = pType
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReservedGoKeywordParameters(ctx, request.(ReservedGoKeywordParametersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReservedGoKeywordParameters")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(ReservedGoKeywordParametersResponseObject); ok {
+		if err := validResponse.VisitReservedGoKeywordParametersResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -832,7 +1004,8 @@ func (sh *strictHandler) ReusableResponses(ctx *gin.Context) {
 	var request ReusableResponsesRequestObject
 
 	var body ReusableResponsesJSONRequestBody
-	if err := ctx.Bind(&body); err != nil {
+	if err := ctx.ShouldBind(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
 		ctx.Error(err)
 		return
 	}
@@ -849,6 +1022,7 @@ func (sh *strictHandler) ReusableResponses(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(ReusableResponsesResponseObject); ok {
 		if err := validResponse.VisitReusableResponsesResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -881,6 +1055,7 @@ func (sh *strictHandler) TextExample(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(TextExampleResponseObject); ok {
 		if err := validResponse.VisitTextExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -907,6 +1082,7 @@ func (sh *strictHandler) UnknownExample(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(UnknownExampleResponseObject); ok {
 		if err := validResponse.VisitUnknownExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -935,6 +1111,7 @@ func (sh *strictHandler) UnspecifiedContentType(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(UnspecifiedContentTypeResponseObject); ok {
 		if err := validResponse.VisitUnspecifiedContentTypeResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -970,6 +1147,7 @@ func (sh *strictHandler) URLEncodedExample(ctx *gin.Context) {
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(URLEncodedExampleResponseObject); ok {
 		if err := validResponse.VisitURLEncodedExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
@@ -986,7 +1164,8 @@ func (sh *strictHandler) HeadersExample(ctx *gin.Context, params HeadersExampleP
 	request.Params = params
 
 	var body HeadersExampleJSONRequestBody
-	if err := ctx.Bind(&body); err != nil {
+	if err := ctx.ShouldBind(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
 		ctx.Error(err)
 		return
 	}
@@ -1003,8 +1182,42 @@ func (sh *strictHandler) HeadersExample(ctx *gin.Context, params HeadersExampleP
 
 	if err != nil {
 		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
 	} else if validResponse, ok := response.(HeadersExampleResponseObject); ok {
 		if err := validResponse.VisitHeadersExampleResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("Unexpected response type: %T", response))
+	}
+}
+
+// UnionExample operation middleware
+func (sh *strictHandler) UnionExample(ctx *gin.Context) {
+	var request UnionExampleRequestObject
+
+	var body UnionExampleJSONRequestBody
+	if err := ctx.ShouldBind(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UnionExample(ctx, request.(UnionExampleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnionExample")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(UnionExampleResponseObject); ok {
+		if err := validResponse.VisitUnionExampleResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -1015,21 +1228,23 @@ func (sh *strictHandler) HeadersExample(ctx *gin.Context, params HeadersExampleP
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xYS4/iOBD+K1btnkaB0D194rbTGmnfI9Ezp9UcirgAzya2166QRoj/vnJsaBjSCFo8",
-	"pNXeEqde/qq+KsdLKExljSbNHoZLcOSt0Z7alzFKR//U5Dm8SfKFU5aV0TCEDyhH6dsqA0e1x3FJa/Ug",
-	"XxjNpFtVtLZUBQbV/JsP+kvwxYwqDE8/OprAEH7IX0LJ41ef0zNWtiRYrVbZdxF8+g0ymBFKcm208fFu",
-	"1zYvLMEQPDulpxCMRLH7TjGlmabkgrcgmoIIAus4hkuwzlhyrCJGcyxr6vaUVsz4GxUcd6D0xOxj+Wg0",
-	"o9JeSDWZkCPNIoEngg0vfG2tcUxSjBcieChYeHJzcpABKw6BwdP2ukgBe8hgTs5HR3f9QX8Q8mUsabQK",
-	"hvC+XcrAIs/aDW0SZE1X3n99+vSnUF5gzaZCVgWW5UJU6PwMy5KkUJpNiLEu2PehdeXazP8ik/rHhGUo",
-	"m7aCPhi5uETFtIW5Vc/3g8GVCnOVwUN01mVjE1S+xbDWzATrsgP0L/pvbRotyDnj0s7yqi5ZWXS8naxd",
-	"tP9YixwD+cZePjGu6klkvBDq5/J0U+BTM+gkydPMNF7MTCPYCElYikbxTKwVv2O30gKFV3paklgHlXVm",
-	"sqTUc3/ScpT28jnYuDiXsh0rz72maXpt8mpXki6MJPk2s6rCKeVWT3fVg21kGMJ4waFs97vrmYooA6Zn",
-	"zm2JSh8eHVdqJ/8jfTZiR7quzya9neR1E3dNKi8K1GIc+DjxgcRdvvZIOkqeRlsStxlxhzHaO61do2uG",
-	"5L8+qT7T81FD6oxkvXY1ngpYHRdfxyxpHQPbG7l/BIpzJcnklX040fLNQPWWCjVRJHtpF70Y22st4dHo",
-	"whHvDu1wAtaGxcZYOJjzjEREIBPeiIZEVXsWFr0XitsuUqp4uJe01zy+vET2GD2FyX5EVt9dKKfvbpXR",
-	"h8Hd6SrvL1w3O8P3FT6Ofv8YZU79wznblD/xjHI+vzeiczhW97buALop/HMUeJnpBak5SYFaCkdcO01S",
-	"zBWuf1v3uJkMvKTVosOKuPX61xLCCEkXC5CBxoo273epCJQLyLKrKTt0PXHQ1j1kh+4svv6Hf6gvedNz",
-	"6TpdZRAvZWKx1K4MGWW2wzyPlzl93+B0Sq6vTI5Wwerr6t8AAAD//ygSomqZEwAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

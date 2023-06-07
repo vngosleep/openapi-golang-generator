@@ -1,12 +1,13 @@
 // Package middleware implements middleware function for go-chi or net/http,
 // which validates incoming HTTP requests to make sure that they conform to the given OAPI 3.0 specification.
-// When OAPI validation failes on the request, we return an HTTP/400.
+// When OAPI validation fails on the request, we return an HTTP/400.
 package middleware
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -27,6 +28,8 @@ type Options struct {
 	Options           openapi3filter.Options
 	ErrorHandler      ErrorHandler
 	MultiErrorHandler MultiErrorHandler
+	// SilenceServersWarning allows silencing a warning for https://github.com/deepmap/oapi-codegen/issues/882 that reports when an OpenAPI spec has `spec.Servers != nil`
+	SilenceServersWarning bool
 }
 
 // OapiRequestValidator Creates middleware to validate request by swagger spec.
@@ -38,6 +41,10 @@ func OapiRequestValidator(swagger *openapi3.T) func(next http.Handler) http.Hand
 // OapiRequestValidatorWithOptions Creates middleware to validate request by swagger spec.
 // This middleware is good for net/http either since go-chi is 100% compatible with net/http.
 func OapiRequestValidatorWithOptions(swagger *openapi3.T, options *Options) func(next http.Handler) http.Handler {
+	if swagger.Servers != nil && (options == nil || options.SilenceServersWarning) {
+		log.Println("WARN: OapiRequestValidatorWithOptions called with an OpenAPI spec that has `Servers` set. This may lead to an HTTP 400 with `no matching operation was found` when sending a valid request, as the validator performs `Host` header validation. If you're expecting `Host` header validation, you can silence this warning by setting `Options.SilenceServersWarning = true`. See https://github.com/deepmap/oapi-codegen/issues/882 for more information.")
+	}
+
 	router, err := gorillamux.NewRouter(swagger)
 	if err != nil {
 		panic(err)
@@ -125,7 +132,7 @@ func getMultiErrorHandlerFromOptions(options *Options) MultiErrorHandler {
 }
 
 // defaultMultiErrorHandler returns a StatusBadRequest (400) and a list
-// of all of the errors. This method is called if there are no other
+// of all the errors. This method is called if there are no other
 // methods defined on the options.
 func defaultMultiErrorHandler(me openapi3.MultiError) (int, error) {
 	return http.StatusBadRequest, me

@@ -18,8 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -34,7 +35,7 @@ const (
 	UserDataKey   = "oapi-codegen/user-data"
 )
 
-// Create validator middleware from a YAML file path
+// OapiValidatorFromYamlFile creates a validator middleware from a YAML file path
 func OapiValidatorFromYamlFile(path string) (gin.HandlerFunc, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -49,7 +50,7 @@ func OapiValidatorFromYamlFile(path string) (gin.HandlerFunc, error) {
 	return OapiRequestValidator(swagger), nil
 }
 
-// This is an gin middleware function which validates incoming HTTP requests
+// OapiRequestValidator is an gin middleware function which validates incoming HTTP requests
 // to make sure that they conform to the given OAPI 3.0 specification. When
 // OAPI validation fails on the request, we return an HTTP/400 with error message
 func OapiRequestValidator(swagger *openapi3.T) gin.HandlerFunc {
@@ -70,10 +71,16 @@ type Options struct {
 	ParamDecoder      openapi3filter.ContentParameterDecoder
 	UserData          interface{}
 	MultiErrorHandler MultiErrorHandler
+	// SilenceServersWarning allows silencing a warning for https://github.com/deepmap/oapi-codegen/issues/882 that reports when an OpenAPI spec has `spec.Servers != nil`
+	SilenceServersWarning bool
 }
 
-// Create a validator from a swagger object, with validation options
+// OapiRequestValidatorWithOptions creates a validator from a swagger object, with validation options
 func OapiRequestValidatorWithOptions(swagger *openapi3.T, options *Options) gin.HandlerFunc {
+	if swagger.Servers != nil && (options == nil || options.SilenceServersWarning) {
+		log.Println("WARN: OapiRequestValidatorWithOptions called with an OpenAPI spec that has `Servers` set. This may lead to an HTTP 400 with `no matching operation was found` when sending a valid request, as the validator performs `Host` header validation. If you're expecting `Host` header validation, you can silence this warning by setting `Options.SilenceServersWarning = true`. See https://github.com/deepmap/oapi-codegen/issues/882 for more information.")
+	}
+
 	router, err := gorillamux.NewRouter(swagger)
 	if err != nil {
 		panic(err)
@@ -122,12 +129,12 @@ func ValidateRequestFromContext(c *gin.Context, router routers.Router, options *
 
 	// Pass the gin context into the request validator, so that any callbacks
 	// which it invokes make it available.
-	requestContext := context.WithValue(context.Background(), GinContextKey, c)
+	requestContext := context.WithValue(context.Background(), GinContextKey, c) //nolint:staticcheck
 
 	if options != nil {
 		validationInput.Options = &options.Options
 		validationInput.ParamDecoder = options.ParamDecoder
-		requestContext = context.WithValue(requestContext, UserDataKey, options.UserData)
+		requestContext = context.WithValue(requestContext, UserDataKey, options.UserData) //nolint:staticcheck
 	}
 
 	err = openapi3filter.ValidateRequest(requestContext, validationInput)
@@ -156,7 +163,7 @@ func ValidateRequestFromContext(c *gin.Context, router routers.Router, options *
 	return nil
 }
 
-// Helper function to get the echo context from within requests. It returns
+// GetGinContext gets the echo context from within requests. It returns
 // nil if not found or wrong type.
 func GetGinContext(c context.Context) *gin.Context {
 	iface := c.Value(GinContextKey)
